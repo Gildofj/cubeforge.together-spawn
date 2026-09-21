@@ -1,0 +1,18 @@
+# Build Artifacts
+build/
+dist/
+out/
+.cache/
+
+# IDE / Editor Files
+.vs/
+.vscode/
+*.user
+*.suo
+compile_commands.json
+CMakeUserPresets.json
+
+# Logs and runtime configs
+*.log
+together_spawn_config.json
+together_spawn_history.json
