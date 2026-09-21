@@ -88,7 +88,6 @@ namespace Utils {
 
         for (cube::Creature* c : game->world->creatures) {
             if (!c) continue;
-            // Player creatures have hostility_type == Player (0) and usually a non-empty name or steam_id
             if (c->entity_data.hostility_type == cube::Creature::EntityBehaviour::Player) {
                 if (c != local) {
                     players.push_back(c);
@@ -109,7 +108,6 @@ namespace Utils {
             }
         }
 
-        // Also check local player
         if (game->world->local_creature && static_cast<uint64_t>(game->world->local_creature->entity_data.steam_id) == steamID) {
             return game->world->local_creature;
         }
@@ -143,10 +141,9 @@ namespace Utils {
         creature->entity_data.velocity = FloatVector3(0.0f, 0.0f, 0.0f);
         creature->entity_data.retreat = FloatVector3(0.0f, 0.0f, 0.0f);
 
-        // Update current region
         i64 blockX = targetPos.x / DOTS_PER_BLOCK;
         i64 blockY = targetPos.y / DOTS_PER_BLOCK;
-        creature->entity_data.current_region.x = static_cast<int>(blockX / 1024); // 1024 blocks per region
+        creature->entity_data.current_region.x = static_cast<int>(blockX / 1024);
         creature->entity_data.current_region.y = static_cast<int>(blockY / 1024);
         creature->entity_data.some_zone_position.x = static_cast<int>(blockX / 64);
         creature->entity_data.some_zone_position.y = static_cast<int>(blockY / 64);

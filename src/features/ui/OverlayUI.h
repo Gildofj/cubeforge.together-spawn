@@ -9,14 +9,7 @@ namespace Features {
     public:
         static OverlayUI& Instance();
 
-        /**
-         * @brief Intercepts DirectInput keyboard state to detect F6 hotkey toggle.
-         */
         void HandleKeyboardState(BYTE* diKeys);
-
-        /**
-         * @brief Called in the DirectX 11 / ImGui rendering pass.
-         */
         void DrawImGui();
 
         void ToggleVisibility();

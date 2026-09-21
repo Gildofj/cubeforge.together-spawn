@@ -30,16 +30,13 @@ namespace Core {
             return m_role == SessionRole::Host || m_role == SessionRole::Client;
         }
 
-        // Invulnerability
         void GrantInvulnerability(float durationSeconds);
         bool IsInvulnerable() const;
 
-        // Command Cooldown
         bool CanUseTeleportCommand() const;
         void RecordTeleportCommandUsed();
         int GetRemainingCooldownSeconds() const;
 
-        // First join state for current world/session
         bool HasCurrentSessionSpawned() const { return m_currentSessionSpawned; }
         void SetCurrentSessionSpawned(bool spawned) { m_currentSessionSpawned = spawned; }
 

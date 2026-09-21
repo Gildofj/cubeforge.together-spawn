@@ -32,10 +32,7 @@ namespace Features {
     }
 
     void OverlayUI::DrawImGui() {
-        // ImGui hooks are rendered when an active Dear ImGui context is present in CubeForge Loader
         if (!m_visible) return;
-
-        // Custom UI layout hook
     }
 
 } // namespace Features

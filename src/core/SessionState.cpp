@@ -32,7 +32,6 @@ namespace Core {
         m_worldSeed = game->seed;
         m_characterSlot = game->current_character_slot;
 
-        // Check if hosting or client
         if (game->host.running || !game->host.connections.empty()) {
             m_role = SessionRole::Host;
             if (game->world && game->world->local_creature) {
@@ -46,7 +45,6 @@ namespace Core {
             m_hostSteamID = 0;
         }
 
-        // If session changed (e.g. joined different server / new seed), reload spawn state
         if (prevSeed != m_worldSeed || prevHost != m_hostSteamID) {
             if (m_role == SessionRole::Client && m_hostSteamID != 0) {
                 m_currentSessionSpawned = Config::Instance().HasSpawnedInSession(m_hostSteamID, m_worldSeed, m_characterSlot);

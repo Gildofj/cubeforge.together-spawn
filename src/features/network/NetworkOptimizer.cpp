@@ -16,7 +16,6 @@ namespace Features {
         if (settings.autoAcceptP2PRequests) {
             Utils::Logger::Info("P2P session request automatically accepted for SteamID: " + std::to_string(steamID));
 
-            // Directly ensure Steam networking accepts the session if interface is active
             ISteamNetworking* steamNet = cube::SteamNetworking();
             if (steamNet) {
                 CSteamID userSteamID;
@@ -24,7 +23,6 @@ namespace Features {
                 steamNet->AcceptP2PSessionWithUser(userSteamID);
             }
 
-            // Return 1 so the loader trampoline routes to allow jump (ASMP2PRequestHandler_allow)
             return 1;
         }
 
@@ -36,7 +34,6 @@ namespace Features {
 
         m_tickCounter++;
 
-        // Periodic watchdog check (every 300 ticks / ~5 seconds)
         if (m_tickCounter % 300 == 0) {
             if (game->host.running) {
                 size_t numClients = game->host.connections.size();

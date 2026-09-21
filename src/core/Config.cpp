@@ -89,7 +89,6 @@ namespace Core {
         bool inSpawnedSessionsArray = false;
 
         while (std::getline(file, line)) {
-            // Trim leading whitespace
             size_t start = line.find_first_not_of(" \t\r\n");
             if (start == std::string::npos) continue;
             std::string trimmed = line.substr(start);
@@ -113,7 +112,6 @@ namespace Core {
                 continue;
             }
 
-            // Parse key-values
             if (trimmed.find("\"auto_spawn_near_host\":") != std::string::npos) {
                 m_settings.autoSpawnNearHostOnFirstJoin = (trimmed.find("true") != std::string::npos);
             } else if (trimmed.find("\"spawn_radius_blocks\":") != std::string::npos) {

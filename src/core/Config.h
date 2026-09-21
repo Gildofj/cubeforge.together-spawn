@@ -30,23 +30,8 @@ namespace Core {
         ModSettings& GetSettings();
         const ModSettings& GetSettings() const;
 
-        /**
-         * @brief Checks if a character has already spawned in this specific host session.
-         * @param hostSteamID Steam ID of the host.
-         * @param worldSeed Seed of the world.
-         * @param characterSlot Character slot index.
-         * @return true if already spawned previously, false if this is first join.
-         */
         bool HasSpawnedInSession(uint64_t hostSteamID, int worldSeed, int characterSlot) const;
-
-        /**
-         * @brief Marks a session as spawned so the player doesn't get teleported on subsequent joins.
-         */
         void MarkSessionAsSpawned(uint64_t hostSteamID, int worldSeed, int characterSlot);
-
-        /**
-         * @brief Clears spawn history for a specific session or all sessions.
-         */
         void ResetSessionSpawn(uint64_t hostSteamID, int worldSeed, int characterSlot);
         void ClearAllSpawnHistory();
 

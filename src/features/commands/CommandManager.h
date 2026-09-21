@@ -11,11 +11,6 @@ namespace Features {
     public:
         static CommandManager& Instance();
 
-        /**
-         * @brief Intercepts chat messages and processes /slash commands.
-         * @param message Pointer to the chat message wide string.
-         * @return 1 to suppress from public chat, 0 to allow pass-through.
-         */
         int HandleChat(std::wstring* message);
 
     private:
@@ -23,7 +18,6 @@ namespace Features {
         ~CommandManager() = default;
 
         bool ProcessCommand(cube::Game* game, const std::vector<std::wstring>& args);
-
         void HandleTogetherCommand(cube::Game* game, const std::vector<std::wstring>& args);
         void HandleTpHostCommand(cube::Game* game);
         void HandleTpPlayerCommand(cube::Game* game, const std::wstring& targetName);
