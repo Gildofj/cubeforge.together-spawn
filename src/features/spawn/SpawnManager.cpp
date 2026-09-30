@@ -1,4 +1,5 @@
 #include "SpawnManager.h"
+#include "../network/NetworkOptimizer.h"
 #include "../../core/Config.h"
 #include "../../core/SessionState.h"
 #include "../../utils/ModUtils.h"
@@ -80,55 +81,163 @@ namespace Features {
         }
 
         LongVector3 fallbackPos = Utils::MathUtils::CalculateRadialOffset(targetPos, preferredRadiusBlocks, 0.0f);
-        fallbackPos.z += DOTS_PER_BLOCK;
+        fallbackPos.z += (DOTS_PER_BLOCK * 2);
         return fallbackPos;
     }
 
-    bool SpawnManager::ExecuteSpawnNearHost(cube::Game* game, bool force) {
-        if (!game || !game->world) return false;
-
-        cube::Creature* localPlayer = game->world->local_creature;
-        if (!localPlayer) return false;
+    void SpawnManager::RequestSpawnFromHost(cube::Game* game, bool force) {
+        if (!game) return;
 
         auto& session = Core::SessionState::Instance();
-        const auto& settings = Core::Config::Instance().GetSettings();
-
         if (session.GetRole() != Core::SessionRole::Client) {
             if (force) {
                 Utils::PrintChat(L"[TogetherSpawn] Voce e o Host desta sessao.", Utils::Colors::Gold);
             }
-            return false;
+            return;
         }
 
         if (!force && session.HasCurrentSessionSpawned()) {
-            return false;
+            return;
         }
 
-        cube::Creature* hostCreature = FindHostCreature(game);
-        if (!hostCreature) {
-            Utils::Logger::Debug("Host creature not yet loaded in creature list.");
-            return false;
+        uint64_t hostSteamID = session.GetHostSteamID();
+        if (hostSteamID == 0) {
+            hostSteamID = game->client.host_steam_id.ConvertToUint64();
         }
 
-        auto safePosOpt = CalculateSafeGroundPosition(game, hostCreature->entity_data.position, settings.spawnRadiusInBlocks);
-        if (!safePosOpt.has_value()) {
-            Utils::Logger::Warn("Could not find safe terrain around host yet.");
-            return false;
+        if (hostSteamID != 0) {
+            NetworkOptimizer::Instance().SendSpawnRequest(game, hostSteamID);
+            m_spawnRequestPending = true;
         }
+    }
 
-        LongVector3 safePos = safePosOpt.value();
-        if (Utils::TeleportCreature(localPlayer, safePos)) {
+    bool SpawnManager::OnSpawnCoordinatesReceived(cube::Game* game, const LongVector3& spawnPos) {
+        if (!game || !game->world || !game->world->local_creature) return false;
+
+        cube::Creature* localPlayer = game->world->local_creature;
+        auto& session = Core::SessionState::Instance();
+        const auto& settings = Core::Config::Instance().GetSettings();
+
+        if (Utils::TeleportCreature(localPlayer, spawnPos)) {
             session.SetCurrentSessionSpawned(true);
             Core::Config::Instance().MarkSessionAsSpawned(session.GetHostSteamID(), session.GetWorldSeed(), session.GetCharacterSlot());
-
             session.GrantInvulnerability(settings.invulnerabilitySecondsAfterSpawn);
 
             Utils::PrintChat(L"--------------------------------------------------", Utils::Colors::Cyan);
-            Utils::PrintChat(L"[TogetherSpawn] Voce spawnou com sucesso proximo ao Host!", Utils::Colors::Emerald);
+            Utils::PrintChat(L"[TogetherSpawn] Voce spawnou com sucesso junto ao Host!", Utils::Colors::Emerald);
             Utils::PrintChat(L"[TogetherSpawn] Protecao de aterrissagem ativa temporariamente.", Utils::Colors::Gold);
             Utils::PrintChat(L"--------------------------------------------------", Utils::Colors::Cyan);
 
-            Utils::Logger::Info("First-time spawn near host completed successfully.");
+            Utils::Logger::Info("P2P First-time spawn near host completed successfully at (" +
+                                std::to_string(spawnPos.x) + ", " +
+                                std::to_string(spawnPos.y) + ", " +
+                                std::to_string(spawnPos.z) + ").");
+            m_spawnRequestPending = false;
+            return true;
+        }
+
+        return false;
+    }
+
+    void SpawnManager::RequestTeleportToHost(cube::Game* game) {
+        if (!game) return;
+
+        auto& session = Core::SessionState::Instance();
+        if (session.GetRole() != Core::SessionRole::Client) {
+            Utils::PrintChat(L"[TogetherSpawn] Voce e o Host ou esta em Singleplayer.", Utils::Colors::Gold);
+            return;
+        }
+
+        if (!session.CanUseTeleportCommand()) {
+            int rem = session.GetRemainingCooldownSeconds();
+            Utils::PrintChat(L"[TogetherSpawn] Comando em cooldown. Aguarde " + std::to_wstring(rem) + L"s.", Utils::Colors::Orange);
+            return;
+        }
+
+        // Check if host creature is already in local vision
+        cube::Creature* host = FindHostCreature(game);
+        if (host) {
+            if (TeleportToPlayer(game, host)) {
+                session.RecordTeleportCommandUsed();
+                Utils::PrintChat(L"[TogetherSpawn] Teleportado com sucesso para o Host!", Utils::Colors::Emerald);
+            }
+            return;
+        }
+
+        // Host is far away in another region: request remote coordinates via P2P
+        uint64_t hostSteamID = session.GetHostSteamID();
+        if (hostSteamID != 0) {
+            Utils::PrintChat(L"[TogetherSpawn] Localizando Host no servidor...", Utils::Colors::Cyan);
+            NetworkOptimizer::Instance().SendTeleportRequest(hostSteamID, "", hostSteamID);
+        } else {
+            Utils::PrintChat(L"[TogetherSpawn] Host nao encontrado.", Utils::Colors::Red);
+        }
+    }
+
+    void SpawnManager::RequestTeleportToPlayer(cube::Game* game, const std::string& targetName) {
+        if (!game || targetName.empty()) return;
+
+        auto& session = Core::SessionState::Instance();
+        if (!session.CanUseTeleportCommand()) {
+            int rem = session.GetRemainingCooldownSeconds();
+            Utils::PrintChat(L"[TogetherSpawn] Comando em cooldown. Aguarde " + std::to_wstring(rem) + L"s.", Utils::Colors::Orange);
+            return;
+        }
+
+        // Check if player is loaded locally
+        cube::Creature* target = Utils::FindPlayerByName(targetName);
+        if (target) {
+            if (Utils::IsLocalPlayer(target)) {
+                Utils::PrintChat(L"[TogetherSpawn] Voce ja esta na sua propria posicao.", Utils::Colors::Orange);
+                return;
+            }
+            if (TeleportToPlayer(game, target)) {
+                session.RecordTeleportCommandUsed();
+            }
+            return;
+        }
+
+        // If client and player is remote: query Host via P2P
+        if (session.GetRole() == Core::SessionRole::Client) {
+            uint64_t hostSteamID = session.GetHostSteamID();
+            if (hostSteamID != 0) {
+                Utils::PrintChat(L"[TogetherSpawn] Buscando coordenadas do jogador via Host...", Utils::Colors::Cyan);
+                NetworkOptimizer::Instance().SendTeleportRequest(hostSteamID, targetName, 0);
+                return;
+            }
+        }
+
+        Utils::PrintChat(L"[TogetherSpawn] Jogador '" + Utils::Utf8ToWide(targetName) + L"' nao encontrado.", Utils::Colors::Red);
+    }
+
+    bool SpawnManager::OnTeleportCoordinatesReceived(cube::Game* game, const Network::TeleportResponsePacket& response) {
+        if (!game) return false;
+
+        if (response.success) {
+            std::string targetLabel = (response.targetName[0] != '\0') ? response.targetName : "Jogador";
+            if (TeleportToPosition(game, response.targetPos, targetLabel)) {
+                Core::SessionState::Instance().RecordTeleportCommandUsed();
+                return true;
+            }
+        } else {
+            std::string errMsg = (response.errorMessage[0] != '\0') ? response.errorMessage : "Falha ao localizar destino.";
+            Utils::PrintChat(L"[TogetherSpawn] " + Utils::Utf8ToWide(errMsg), Utils::Colors::Red);
+        }
+
+        return false;
+    }
+
+    bool SpawnManager::TeleportToPosition(cube::Game* game, const LongVector3& targetPos, const std::string& destinationLabel) {
+        if (!game || !game->world || !game->world->local_creature) return false;
+
+        cube::Creature* localPlayer = game->world->local_creature;
+        const auto& settings = Core::Config::Instance().GetSettings();
+
+        if (Utils::TeleportCreature(localPlayer, targetPos)) {
+            Core::SessionState::Instance().GrantInvulnerability(settings.invulnerabilitySecondsAfterSpawn);
+            if (!destinationLabel.empty()) {
+                Utils::PrintChat(L"[TogetherSpawn] Teleportado para: " + Utils::Utf8ToWide(destinationLabel), Utils::Colors::Green);
+            }
             return true;
         }
 
@@ -145,16 +254,13 @@ namespace Features {
         auto safePosOpt = CalculateSafeGroundPosition(game, target->entity_data.position, settings.spawnRadiusInBlocks);
 
         LongVector3 dest = safePosOpt.value_or(target->entity_data.position);
-        if (Utils::TeleportCreature(localPlayer, dest)) {
-            Core::SessionState::Instance().GrantInvulnerability(settings.invulnerabilitySecondsAfterSpawn);
-            Core::SessionState::Instance().RecordTeleportCommandUsed();
+        std::string targetName(target->entity_data.name);
+        return TeleportToPosition(game, dest, targetName);
+    }
 
-            std::string targetName(target->entity_data.name);
-            Utils::PrintChat(L"[TogetherSpawn] Teleportado para: " + Utils::Utf8ToWide(targetName), Utils::Colors::Green);
-            return true;
-        }
-
-        return false;
+    bool SpawnManager::ExecuteSpawnNearHost(cube::Game* game, bool force) {
+        RequestSpawnFromHost(game, force);
+        return true;
     }
 
     void SpawnManager::Update(cube::Game* game) {
@@ -170,9 +276,9 @@ namespace Features {
             !session.HasCurrentSessionSpawned()) {
 
             m_spawnAttemptCooldownTicks++;
-            if (m_spawnAttemptCooldownTicks >= 30) {
+            if (m_spawnAttemptCooldownTicks >= 60) { // Check/request every 1 second
                 m_spawnAttemptCooldownTicks = 0;
-                ExecuteSpawnNearHost(game, false);
+                RequestSpawnFromHost(game, false);
             }
         }
     }

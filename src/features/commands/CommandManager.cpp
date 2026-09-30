@@ -86,7 +86,7 @@ namespace Features {
             }
 
             auto players = Utils::GetOnlinePlayers(true);
-            Utils::PrintChat(L" Jogadores no mundo: " + std::to_wstring(players.size()), Utils::Colors::Emerald);
+            Utils::PrintChat(L" Jogadores carregados na area: " + std::to_wstring(players.size()), Utils::Colors::Emerald);
 
             cube::Creature* local = game->world ? game->world->local_creature : nullptr;
             for (cube::Creature* p : players) {
@@ -103,10 +103,8 @@ namespace Features {
 
         if (subCmd == L"sync" || subCmd == L"spawn") {
             if (session.GetRole() == Core::SessionRole::Client) {
-                Utils::PrintChat(L"[TogetherSpawn] Re-executando sincronizacao de spawn com o Host...", Utils::Colors::Cyan);
-                if (!SpawnManager::Instance().ExecuteSpawnNearHost(game, true)) {
-                    Utils::PrintChat(L"[TogetherSpawn] Host ainda nao encontrado ou terreno carregando.", Utils::Colors::Orange);
-                }
+                Utils::PrintChat(L"[TogetherSpawn] Requisitando sincronizacao de spawn com o Host via P2P...", Utils::Colors::Cyan);
+                SpawnManager::Instance().RequestSpawnFromHost(game, true);
             } else {
                 Utils::PrintChat(L"[TogetherSpawn] Voce e o Host da sessao.", Utils::Colors::Gold);
             }
@@ -140,60 +138,12 @@ namespace Features {
     }
 
     void CommandManager::HandleTpHostCommand(cube::Game* game) {
-        auto& session = Core::SessionState::Instance();
-
-        if (session.GetRole() != Core::SessionRole::Client) {
-            Utils::PrintChat(L"[TogetherSpawn] Voce e o Host ou esta em Singleplayer.", Utils::Colors::Gold);
-            return;
-        }
-
-        if (!session.CanUseTeleportCommand()) {
-            int rem = session.GetRemainingCooldownSeconds();
-            Utils::PrintChat(L"[TogetherSpawn] Comando em cooldown. Aguarde " + std::to_wstring(rem) + L"s.", Utils::Colors::Orange);
-            return;
-        }
-
-        cube::Creature* host = SpawnManager::Instance().FindHostCreature(game);
-        if (!host) {
-            Utils::PrintChat(L"[TogetherSpawn] Host nao encontrado no mundo.", Utils::Colors::Red);
-            return;
-        }
-
-        if (SpawnManager::Instance().TeleportToPlayer(game, host)) {
-            session.RecordTeleportCommandUsed();
-            Utils::PrintChat(L"[TogetherSpawn] Teleportado com sucesso para o Host!", Utils::Colors::Emerald);
-        } else {
-            Utils::PrintChat(L"[TogetherSpawn] Falha ao calcular posicao segura para teleporte.", Utils::Colors::Red);
-        }
+        SpawnManager::Instance().RequestTeleportToHost(game);
     }
 
     void CommandManager::HandleTpPlayerCommand(cube::Game* game, const std::wstring& targetName) {
-        auto& session = Core::SessionState::Instance();
-
-        if (!session.CanUseTeleportCommand()) {
-            int rem = session.GetRemainingCooldownSeconds();
-            Utils::PrintChat(L"[TogetherSpawn] Comando em cooldown. Aguarde " + std::to_wstring(rem) + L"s.", Utils::Colors::Orange);
-            return;
-        }
-
         std::string nameUtf8 = Utils::WideToUtf8(targetName);
-        cube::Creature* target = Utils::FindPlayerByName(nameUtf8);
-
-        if (!target) {
-            Utils::PrintChat(L"[TogetherSpawn] Jogador '" + targetName + L"' nao encontrado.", Utils::Colors::Red);
-            return;
-        }
-
-        if (Utils::IsLocalPlayer(target)) {
-            Utils::PrintChat(L"[TogetherSpawn] Voce ja esta na sua propria posicao.", Utils::Colors::Orange);
-            return;
-        }
-
-        if (SpawnManager::Instance().TeleportToPlayer(game, target)) {
-            session.RecordTeleportCommandUsed();
-        } else {
-            Utils::PrintChat(L"[TogetherSpawn] Falha ao teletransportar para o jogador.", Utils::Colors::Red);
-        }
+        SpawnManager::Instance().RequestTeleportToPlayer(game, nameUtf8);
     }
 
     void CommandManager::HandleSetTeamSpawnCommand(cube::Game* game) {
@@ -216,10 +166,10 @@ namespace Features {
     void CommandManager::PrintHelp() {
         Utils::PrintChat(L"--- [TogetherSpawn: Comandos] ---", Utils::Colors::Cyan);
         Utils::PrintChat(L" /together status        - Exibe informacoes e lista de jogadores da sessao", Utils::Colors::White);
-        Utils::PrintChat(L" /together sync          - Sincroniza e teleporta proximo ao Host", Utils::Colors::White);
+        Utils::PrintChat(L" /together sync          - Sincroniza e teleporta proximo ao Host via P2P", Utils::Colors::White);
         Utils::PrintChat(L" /together reset         - Reseta o historico de primeiro spawn da sessao", Utils::Colors::White);
         Utils::PrintChat(L" /together radius <N>    - Configura o raio de spawn (padrao: 4 blocos)", Utils::Colors::White);
-        Utils::PrintChat(L" /tphost (ou /spawn)     - Teleporta para o Host da sessao", Utils::Colors::Gold);
+        Utils::PrintChat(L" /tphost (ou /spawn)     - Teleporta para o Host da sessao (qualquer regiao)", Utils::Colors::Gold);
         Utils::PrintChat(L" /tp <nome>              - Teleporta para um amigo conectado", Utils::Colors::Gold);
         Utils::PrintChat(L" /setteamspawn           - [Host] Define ponto de spawn customizado", Utils::Colors::Gold);
         Utils::PrintChat(L" [F6]                    - Abre/fecha o menu de configuracoes ImGui", Utils::Colors::Yellow);
