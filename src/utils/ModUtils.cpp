@@ -141,12 +141,12 @@ namespace Utils {
         creature->entity_data.velocity = FloatVector3(0.0f, 0.0f, 0.0f);
         creature->entity_data.retreat = FloatVector3(0.0f, 0.0f, 0.0f);
 
-        i64 blockX = targetPos.x / DOTS_PER_BLOCK;
-        i64 blockY = targetPos.y / DOTS_PER_BLOCK;
-        creature->entity_data.current_region.x = static_cast<int>(blockX / 1024);
-        creature->entity_data.current_region.y = static_cast<int>(blockY / 1024);
-        creature->entity_data.some_zone_position.x = static_cast<int>(blockX / 64);
-        creature->entity_data.some_zone_position.y = static_cast<int>(blockY / 64);
+        i64 blockX = pydiv(targetPos.x, DOTS_PER_BLOCK);
+        i64 blockY = pydiv(targetPos.y, DOTS_PER_BLOCK);
+        creature->entity_data.current_region.x = static_cast<int>(pydiv(blockX, 1024));
+        creature->entity_data.current_region.y = static_cast<int>(pydiv(blockY, 1024));
+        creature->entity_data.some_zone_position.x = static_cast<int>(pydiv(blockX, 64));
+        creature->entity_data.some_zone_position.y = static_cast<int>(pydiv(blockY, 64));
 
         Logger::Info("Teleported creature " + std::string(creature->entity_data.name) +
                      " to (" + std::to_string(targetPos.x) + ", " +

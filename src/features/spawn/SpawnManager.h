@@ -14,6 +14,7 @@ namespace Features {
 
         void Initialize();
         void Update(cube::Game* game);
+        void ResetCooldown();
 
         cube::Creature* FindHostCreature(cube::Game* game);
         std::optional<LongVector3> CalculateSafeGroundPosition(cube::Game* game, const LongVector3& targetPos, float preferredRadiusBlocks);

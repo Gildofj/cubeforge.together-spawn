@@ -65,15 +65,24 @@ namespace Features {
         if (hostSteamID == 0) return;
 
         Network::SpawnRequestPacket packet;
+        uint64_t mySteamID = Core::SessionState::Instance().GetLocalSteamID();
+        if (mySteamID == 0 && cube::SteamUser()) {
+            mySteamID = cube::SteamUser()->GetSteamID().ConvertToUint64();
+        }
+        if (mySteamID == 0 && game && game->world && game->world->local_creature) {
+            mySteamID = static_cast<uint64_t>(game->world->local_creature->entity_data.steam_id);
+        }
+
+        packet.clientSteamID = mySteamID;
         if (game && game->world && game->world->local_creature) {
-            packet.clientSteamID = static_cast<uint64_t>(game->world->local_creature->entity_data.steam_id);
             std::string name(game->world->local_creature->entity_data.name);
             strncpy_s(packet.characterName, name.c_str(), sizeof(packet.characterName) - 1);
         }
         packet.worldSeed = game ? game->seed : 0;
         packet.characterSlot = game ? game->current_character_slot : 0;
 
-        Utils::Logger::Info("Sending P2P SpawnRequest to Host SteamID: " + std::to_string(hostSteamID));
+        Utils::Logger::Info("Sending P2P SpawnRequest to Host SteamID: " + std::to_string(hostSteamID) +
+                            " from Client SteamID: " + std::to_string(mySteamID));
         SendPacket(hostSteamID, &packet, sizeof(packet));
     }
 
@@ -198,11 +207,13 @@ namespace Features {
     }
 
     void NetworkOptimizer::HandleSpawnRequest(cube::Game* game, const Network::SpawnRequestPacket& packet, uint64_t senderSteamID) {
-        Utils::Logger::Info("Received SpawnRequest from SteamID: " + std::to_string(senderSteamID) +
+        uint64_t targetClientSteamID = (senderSteamID != 0) ? senderSteamID : packet.clientSteamID;
+
+        Utils::Logger::Info("Received SpawnRequest from SteamID: " + std::to_string(targetClientSteamID) +
                             " (Player: " + std::string(packet.characterName) + ")");
 
         if (!game || !game->world || !game->world->local_creature) {
-            SendSpawnResponse(senderSteamID, {0, 0, 0}, false, "Host world is not ready");
+            SendSpawnResponse(targetClientSteamID, {0, 0, 0}, false, "Host world is not ready");
             return;
         }
 
@@ -218,9 +229,9 @@ namespace Features {
             spawnPos = safePosOpt.value_or(hostPos);
         }
 
-        SendSpawnResponse(senderSteamID, spawnPos, true, "Spawn location assigned");
+        SendSpawnResponse(targetClientSteamID, spawnPos, true, "Spawn location assigned");
 
-        std::string clientName = (packet.characterName[0] != '\0') ? packet.characterName : ("SteamID " + std::to_string(senderSteamID));
+        std::string clientName = (packet.characterName[0] != '\0') ? packet.characterName : ("SteamID " + std::to_string(targetClientSteamID));
         Utils::PrintChat(L"[TogetherSpawn] Jogador " + Utils::Utf8ToWide(clientName) + L" sincronizado e spawnado no seu mundo.", Utils::Colors::Emerald);
     }
 

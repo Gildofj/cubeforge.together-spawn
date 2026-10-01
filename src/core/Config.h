@@ -30,16 +30,16 @@ namespace Core {
         ModSettings& GetSettings();
         const ModSettings& GetSettings() const;
 
-        bool HasSpawnedInSession(uint64_t hostSteamID, int worldSeed, int characterSlot) const;
-        void MarkSessionAsSpawned(uint64_t hostSteamID, int worldSeed, int characterSlot);
-        void ResetSessionSpawn(uint64_t hostSteamID, int worldSeed, int characterSlot);
+        bool HasSpawnedInSession(uint64_t hostSteamID, int worldSeed, const std::string& characterName, int characterSlot) const;
+        void MarkSessionAsSpawned(uint64_t hostSteamID, int worldSeed, const std::string& characterName, int characterSlot);
+        void ResetSessionSpawn(uint64_t hostSteamID, int worldSeed, const std::string& characterName, int characterSlot);
         void ClearAllSpawnHistory();
 
     private:
         Config();
         ~Config() = default;
 
-        std::string MakeSessionKey(uint64_t hostSteamID, int worldSeed, int characterSlot) const;
+        std::string MakeSessionKey(uint64_t hostSteamID, int worldSeed, const std::string& characterName, int characterSlot) const;
         std::string GetConfigPath() const;
 
         ModSettings m_settings;

@@ -22,20 +22,22 @@ namespace Features {
         Utils::Logger::Info("Disabled restricted spawn regions for open multiplayer world roaming.");
     }
 
+    void SpawnManager::ResetCooldown() {
+        m_spawnAttemptCooldownTicks = 0;
+        m_spawnRequestPending = false;
+    }
+
     cube::Creature* SpawnManager::FindHostCreature(cube::Game* game) {
         if (!game || !game->world) return nullptr;
 
-        uint64_t hostSteamID = game->client.host_steam_id.ConvertToUint64();
-        if (hostSteamID != 0) {
-            cube::Creature* host = Utils::FindPlayerBySteamID(hostSteamID);
-            if (host) return host;
+        uint64_t hostSteamID = Core::SessionState::Instance().GetHostSteamID();
+        if (hostSteamID == 0) {
+            hostSteamID = game->client.host_steam_id.ConvertToUint64();
         }
 
-        for (cube::Creature* c : game->world->creatures) {
-            if (c && c != game->world->local_creature &&
-                c->entity_data.hostility_type == cube::Creature::EntityBehaviour::Player) {
-                return c;
-            }
+        if (hostSteamID != 0) {
+            cube::Creature* host = Utils::FindPlayerBySteamID(hostSteamID);
+            if (host && host != game->world->local_creature) return host;
         }
 
         return nullptr;
@@ -120,7 +122,7 @@ namespace Features {
 
         if (Utils::TeleportCreature(localPlayer, spawnPos)) {
             session.SetCurrentSessionSpawned(true);
-            Core::Config::Instance().MarkSessionAsSpawned(session.GetHostSteamID(), session.GetWorldSeed(), session.GetCharacterSlot());
+            Core::Config::Instance().MarkSessionAsSpawned(session.GetHostSteamID(), session.GetWorldSeed(), session.GetCharacterName(), session.GetCharacterSlot());
             session.GrantInvulnerability(settings.invulnerabilitySecondsAfterSpawn);
 
             Utils::PrintChat(L"--------------------------------------------------", Utils::Colors::Cyan);
@@ -131,7 +133,7 @@ namespace Features {
             Utils::Logger::Info("P2P First-time spawn near host completed successfully at (" +
                                 std::to_string(spawnPos.x) + ", " +
                                 std::to_string(spawnPos.y) + ", " +
-                                std::to_string(spawnPos.z) + ").");
+                                std::to_string(spawnPos.z) + ") for character: " + session.GetCharacterName());
             m_spawnRequestPending = false;
             return true;
         }
@@ -276,8 +278,11 @@ namespace Features {
             !session.HasCurrentSessionSpawned()) {
 
             m_spawnAttemptCooldownTicks++;
-            if (m_spawnAttemptCooldownTicks >= 60) { // Check/request every 1 second
-                m_spawnAttemptCooldownTicks = 0;
+            // Trigger quickly upon load (15 ticks = 0.25s) and retry every 60 ticks (1s)
+            if (m_spawnAttemptCooldownTicks == 15 || m_spawnAttemptCooldownTicks >= 60) {
+                if (m_spawnAttemptCooldownTicks >= 60) {
+                    m_spawnAttemptCooldownTicks = 0;
+                }
                 RequestSpawnFromHost(game, false);
             }
         }

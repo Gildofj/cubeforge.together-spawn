@@ -28,8 +28,16 @@ namespace Core {
         return m_settings;
     }
 
-    std::string Config::MakeSessionKey(uint64_t hostSteamID, int worldSeed, int characterSlot) const {
-        return std::to_string(hostSteamID) + "_" + std::to_string(worldSeed) + "_" + std::to_string(characterSlot);
+    std::string Config::MakeSessionKey(uint64_t hostSteamID, int worldSeed, const std::string& characterName, int characterSlot) const {
+        std::string safeName = characterName;
+        safeName.erase(std::remove_if(safeName.begin(), safeName.end(), [](char c) {
+            return c == '"' || c == '\\' || c == '/' || c == '_' || static_cast<unsigned char>(c) < 32;
+        }), safeName.end());
+
+        if (safeName.empty()) {
+            safeName = "slot" + std::to_string(characterSlot);
+        }
+        return std::to_string(hostSteamID) + "_" + std::to_string(worldSeed) + "_" + safeName + "_" + std::to_string(characterSlot);
     }
 
     std::string Config::GetConfigPath() const {
@@ -43,25 +51,25 @@ namespace Core {
         return "together_spawn_config.json";
     }
 
-    bool Config::HasSpawnedInSession(uint64_t hostSteamID, int worldSeed, int characterSlot) const {
+    bool Config::HasSpawnedInSession(uint64_t hostSteamID, int worldSeed, const std::string& characterName, int characterSlot) const {
         std::lock_guard<std::mutex> lock(m_mutex);
-        std::string key = MakeSessionKey(hostSteamID, worldSeed, characterSlot);
+        std::string key = MakeSessionKey(hostSteamID, worldSeed, characterName, characterSlot);
         return m_spawnedSessions.find(key) != m_spawnedSessions.end();
     }
 
-    void Config::MarkSessionAsSpawned(uint64_t hostSteamID, int worldSeed, int characterSlot) {
+    void Config::MarkSessionAsSpawned(uint64_t hostSteamID, int worldSeed, const std::string& characterName, int characterSlot) {
         {
             std::lock_guard<std::mutex> lock(m_mutex);
-            std::string key = MakeSessionKey(hostSteamID, worldSeed, characterSlot);
+            std::string key = MakeSessionKey(hostSteamID, worldSeed, characterName, characterSlot);
             m_spawnedSessions.insert(key);
         }
         Save();
     }
 
-    void Config::ResetSessionSpawn(uint64_t hostSteamID, int worldSeed, int characterSlot) {
+    void Config::ResetSessionSpawn(uint64_t hostSteamID, int worldSeed, const std::string& characterName, int characterSlot) {
         {
             std::lock_guard<std::mutex> lock(m_mutex);
-            std::string key = MakeSessionKey(hostSteamID, worldSeed, characterSlot);
+            std::string key = MakeSessionKey(hostSteamID, worldSeed, characterName, characterSlot);
             m_spawnedSessions.erase(key);
         }
         Save();

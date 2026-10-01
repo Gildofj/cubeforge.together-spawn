@@ -112,9 +112,10 @@ namespace Features {
         }
 
         if (subCmd == L"reset") {
-            config.ResetSessionSpawn(session.GetHostSteamID(), session.GetWorldSeed(), session.GetCharacterSlot());
+            config.ResetSessionSpawn(session.GetHostSteamID(), session.GetWorldSeed(), session.GetCharacterName(), session.GetCharacterSlot());
             session.SetCurrentSessionSpawned(false);
-            Utils::PrintChat(L"[TogetherSpawn] Historico de spawn desta sessao resetado. O auto-spawn sera acionado na proxima verificacao.", Utils::Colors::Green);
+            SpawnManager::Instance().ResetCooldown();
+            Utils::PrintChat(L"[TogetherSpawn] Historico de spawn do char '" + Utils::Utf8ToWide(session.GetCharacterName()) + L"' resetado. Auto-spawn ativado!", Utils::Colors::Green);
             return;
         }
 
