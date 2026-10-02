@@ -46,7 +46,7 @@ namespace Core {
         m_localCreature = game->world->local_creature;
 
         if (m_localCreature) {
-            m_characterName = std::string(m_localCreature->entity_data.name);
+            m_characterName = std::string(m_localCreature->entity_data.name, strnlen(m_localCreature->entity_data.name, 16));
             m_characterLevel = static_cast<int>(m_localCreature->entity_data.level);
             m_characterXP = m_localCreature->entity_data.XP;
         } else {
